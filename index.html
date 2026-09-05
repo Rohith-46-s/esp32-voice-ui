@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32-S3 Audio Tester</title>
+  <title>Voice to ESP32 Serial Monitor</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #fff; text-align: center; padding: 20px; margin: 0; }
@@ -14,33 +14,58 @@
     input { background: #2a2a2a; color: #fff; text-align: center; border: 1px solid #333; }
     input:focus { outline: none; border-color: #007bff; }
     button { background: #28a745; color: #fff; font-weight: bold; cursor: pointer; transition: background 0.2s ease; }
-    button:active { opacity: 0.8; }
-    button.recording { background: #dc3545; }
+    button.listening { background: #dc3545; }
     .log-box { margin-top: 15px; padding: 12px; background: #080808; border-radius: 6px; font-family: monospace; font-size: 13px; color: #00ff66; text-align: left; min-height: 100px; word-break: break-all; white-space: pre-wrap; border: 1px solid #222; }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h2>ESP32-S3 Voice Test</h2>
+  <h2>Voice to ESP32 Serial</h2>
   
   <label for="espIp">ESP32-S3 Local IP Address</label>
   <input type="text" id="espIp" placeholder="e.g. 192.168.1.50" />
   
-  <button id="recordBtn" onclick="toggleRecording()">🎤 Start Recording</button>
+  <button id="micBtn" onclick="toggleListening()">🎤 Tap & Speak</button>
 
   <div class="log-box" id="logBox">Status: Ready</div>
 </div>
 
 <script>
-  let mediaRecorder;
-  let audioChunks = [];
-  let isRecording = false;
+  let recognition;
+  let isListening = false;
 
   // Restore cached IP on page load
   document.getElementById('espIp').value = localStorage.getItem('esp_ip') || '';
 
-  async function toggleRecording() {
+  // Initialize browser Web Speech API
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    log("Error: Web Speech API is not supported in this browser. Use Chrome or Safari.");
+  } else {
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      log(`Transcribed: "${transcript}"\n\nSending to ESP32-S3...`);
+      sendTextToEsp32(transcript);
+    };
+
+    recognition.onerror = (event) => {
+      log("Speech recognition error: " + event.error);
+      resetBtn();
+    };
+
+    recognition.onend = () => {
+      resetBtn();
+    };
+  }
+
+  function toggleListening() {
     const ip = document.getElementById('espIp').value.trim();
     if (!ip) {
       alert("Please enter your ESP32-S3 Local IP!");
@@ -48,49 +73,43 @@
     }
     localStorage.setItem('esp_ip', ip);
 
-    const btn = document.getElementById('recordBtn');
+    const btn = document.getElementById('micBtn');
 
-    if (!isRecording) {
+    if (!isListening) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-
-        mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-        mediaRecorder.onstop = sendAudioToEsp32;
-
-        mediaRecorder.start();
-        isRecording = true;
-        btn.innerText = "🛑 Stop & Send";
-        btn.classList.add("recording");
-        log("Recording audio from phone mic...");
+        recognition.start();
+        isListening = true;
+        btn.innerText = "🎙️ Listening... Speak now!";
+        btn.classList.add("listening");
+        log("Listening to your voice...");
       } catch (err) {
-        log("Microphone error: " + err.message);
+        log("Error starting mic: " + err.message);
       }
     } else {
-      mediaRecorder.stop();
-      isRecording = false;
-      btn.innerText = "🎤 Start Recording";
-      btn.classList.remove("recording");
-      log("Processing recording...");
+      recognition.stop();
+      resetBtn();
     }
   }
 
-  async function sendAudioToEsp32() {
+  function resetBtn() {
+    isListening = false;
+    const btn = document.getElementById('micBtn');
+    btn.innerText = "🎤 Tap & Speak";
+    btn.classList.remove("listening");
+  }
+
+  async function sendTextToEsp32(text) {
     const ip = document.getElementById('espIp').value.trim();
-    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-    
-    log(`Sending ${audioBlob.size} bytes to http://${ip}/upload-audio...`);
 
     try {
-      const response = await fetch(`http://${ip}/upload-audio`, {
+      const response = await fetch(`http://${ip}/send-text`, {
         method: 'POST',
-        headers: { 'Content-Type': 'audio/wav' },
-        body: audioBlob
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text })
       });
 
       const result = await response.json();
-      log(`Response from ESP32-S3:\n${JSON.stringify(result, null, 2)}`);
+      log(`Success!\nTranscribed Text: "${text}"\n\nESP32-S3 Response:\n${JSON.stringify(result, null, 2)}`);
     } catch (err) {
       log(`Failed to reach ESP32-S3!\nEnsure phone is on same Wi-Fi network as ESP32.\n\nError: ${err.message}`);
     }
