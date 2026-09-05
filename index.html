@@ -2,239 +2,152 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Voice Smart Switchboard UI</title>
+  <title>Smart Switchboard Interface</title>
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #fff; text-align: center; padding: 20px; margin: 0; }
-    .container { max-width: 440px; margin: 20px auto; background: #1e1e1e; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-    h2 { margin-top: 0; font-size: 20px; color: #f0f0f0; }
-    label { font-size: 12px; color: #aaa; display: block; text-align: left; margin-top: 10px; margin-left: 5%; }
-    input, button { width: 90%; padding: 12px; margin: 6px 0 12px 0; border-radius: 6px; border: none; font-size: 14px; }
-    input { background: #2a2a2a; color: #fff; text-align: center; border: 1px solid #333; }
-    input:focus { outline: none; border-color: #007bff; }
-    button { background: #007bff; color: #fff; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; padding: 20px; }
+    .card { max-width: 420px; margin: 0 auto; background: #1e1e1e; padding: 20px; border-radius: 10px; }
+    input, button { width: 90%; padding: 12px; margin: 8px 0; border-radius: 6px; border: none; font-size: 14px; }
+    input { background: #2a2a2a; color: white; text-align: center; }
+    button { background: #007bff; color: white; font-weight: bold; cursor: pointer; }
     button.listening { background: #dc3545; }
-    .btn-grid { display: flex; gap: 8px; justify-content: center; width: 90%; margin: 0 auto 10px auto; }
-    .btn-grid button { width: 48%; padding: 10px; font-size: 13px; background: #333; margin: 0; }
-    .log-box { margin-top: 15px; padding: 12px; background: #080808; border-radius: 6px; font-family: monospace; font-size: 13px; color: #00ff66; text-align: left; min-height: 120px; word-break: break-all; white-space: pre-wrap; border: 1px solid #222; }
+    .grid { display: flex; gap: 8px; justify-content: center; }
+    .grid button { width: 45%; background: #333; }
+    #log { margin-top: 15px; padding: 10px; background: #000; color: #00ff66; text-align: left; font-family: monospace; font-size: 12px; min-height: 100px; border-radius: 6px; }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <h2>Smart Switchboard Voice UI</h2>
+<div class="card">
+  <h2>Voice Smart Switchboard</h2>
 
-  <label for="espIp">ESP32-S3 Local IP Address</label>
-  <input type="text" id="espIp" placeholder="e.g. 10.93.188.112" />
-
-  <label for="nimKey">NVIDIA NIM API Key</label>
-  <input type="password" id="nimKey" placeholder="nvapi-..." />
-
-  <label for="openaiKey">OpenAI API Key (for Speech TTS)</label>
-  <input type="password" id="openaiKey" placeholder="sk-proj-..." />
+  <label>ESP32 IP Address</label>
+  <input type="text" id="espIp" value="10.93.188.112" />
 
   <button id="micBtn" onclick="toggleListening()">🎤 Tap & Speak</button>
 
-  <div class="btn-grid">
-    <button onclick="handleVoiceInput('what is the time')">🕒 Time</button>
-    <button onclick="handleVoiceInput('turn on socket 1')">🔌 Socket 1 ON</button>
+  <div class="grid">
+    <button onclick="processCommand('what is the time')">🕒 Time</button>
+    <button onclick="processCommand('what is temperature')">🌡️ Temp</button>
   </div>
-  <div class="btn-grid">
-    <button onclick="handleVoiceInput('turn off socket 1')">🔌 Socket 1 OFF</button>
-    <button onclick="handleVoiceInput('turn on socket 2')">⚡ Socket 2 ON</button>
+  <div class="grid">
+    <button onclick="processCommand('turn on socket 1')">🔌 Socket 1 ON</button>
+    <button onclick="processCommand('turn off socket 1')">🔌 Socket 1 OFF</button>
   </div>
 
-  <div class="log-box" id="logBox">Status: Ready</div>
+  <div id="log">Ready</div>
 </div>
 
 <script>
+  // NVIDIA NIM Configured
+  const NIM_KEY = "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";
+  
   let recognition;
   let isListening = false;
 
-  // Restore cached settings from localStorage
-  document.getElementById('espIp').value = localStorage.getItem('esp_ip') || '10.93.188.112';
-  document.getElementById('nimKey').value = localStorage.getItem('nim_key') || '';
-  document.getElementById('openaiKey').value = localStorage.getItem('openai_key') || '';
-
-  // Web Speech API Initialization
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  if (!SpeechRecognition) {
-    log("Web Speech API not supported on this browser. Try Chrome/Edge.");
-  } else {
+  if (SpeechRecognition) {
     recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
     recognition.lang = 'en-US';
 
-    recognition.onresult = async (event) => {
-      const transcript = event.results[0][0].transcript;
-      log(`Recognized Speech: "${transcript}"`);
-      await handleVoiceInput(transcript);
+    recognition.onresult = async (e) => {
+      const text = e.results[0][0].transcript;
+      log(`Recognized: "${text}"`);
+      await processCommand(text);
     };
 
-    recognition.onerror = (event) => {
-      log("Speech recognition error: " + event.error);
-      resetBtn();
-    };
-
-    recognition.onend = () => resetBtn();
+    recognition.onend = () => resetMicBtn();
   }
 
   function toggleListening() {
-    saveSettings();
     const btn = document.getElementById('micBtn');
-
     if (!isListening) {
-      try {
-        recognition.start();
-        isListening = true;
-        btn.innerText = "🎙️ Listening... (Speak Now)";
-        btn.classList.add("listening");
-        log("Listening for voice command...");
-      } catch (err) {
-        log("Microphone error: " + err.message);
-      }
+      recognition.start();
+      isListening = true;
+      btn.innerText = "🎙️ Listening...";
+      btn.classList.add("listening");
     } else {
       recognition.stop();
-      resetBtn();
+      resetMicBtn();
     }
   }
 
-  function resetBtn() {
+  function resetMicBtn() {
     isListening = false;
     const btn = document.getElementById('micBtn');
     btn.innerText = "🎤 Tap & Speak";
     btn.classList.remove("listening");
   }
 
-  function saveSettings() {
-    localStorage.setItem('esp_ip', document.getElementById('espIp').value.trim());
-    localStorage.setItem('nim_key', document.getElementById('nimKey').value.trim());
-    localStorage.setItem('openai_key', document.getElementById('openaiKey').value.trim());
-  }
+  async function processCommand(userText) {
+    const lower = userText.toLowerCase();
+    const isHardware = lower.includes("socket") || lower.includes("time") || lower.includes("temp") || lower.includes("humidity");
 
-  // Core Decision Pipeline
-  async function handleVoiceInput(userPrompt) {
-    saveSettings();
-    const nimApiKey = document.getElementById('nimKey').value.trim();
+    let finalCommand = userText;
 
-    // Check if prompt is a local hardware command or general user question
-    const lower = userPrompt.toLowerCase();
-    const isHardwareCmd = lower.includes("socket") || lower.includes("switch") || lower.includes("time") || lower.includes("relay");
-
-    let textToSendToEsp = userPrompt;
-
-    if (nimApiKey && !isHardwareCmd) {
-      log(`Querying NVIDIA NIM (nvidia/ising-calibration-1.5-31b)...`);
-      textToSendToEsp = await processWithNvidiaNim(userPrompt, nimApiKey);
+    if (!isHardware) {
+      log("Querying NVIDIA NIM (nvidia/ising-calibration-1.5-31b)...");
+      finalCommand = await queryNim(userText);
     }
 
-    // Dispatch command to ESP32-S3 over HTTP
-    await sendCommandToEsp32(textToSendToEsp);
+    await sendToEsp32(finalCommand);
   }
 
-  // NVIDIA NIM LLM Processing
-  async function processWithNvidiaNim(userPrompt, apiKey) {
+  async function queryNim(promptText) {
     try {
-      const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${NIM_KEY}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
           model: "nvidia/ising-calibration-1.5-31b",
-          messages: [{
-            role: "system",
-            content: "You are a smart switchboard assistant. If the user asks a question, answer it in under 15 words. If it is a home automation command, respond with one of: 'turn on socket 1', 'turn off socket 1', 'turn on socket 2', 'turn off socket 2', 'what is the time'."
-          }, {
-            role: "user",
-            content: userPrompt
-          }],
-          temperature: 0.2
+          messages: [
+            { role: "system", content: "You are a smart switchboard voice assistant. Keep answers under 12 words." },
+            { role: "user", content: promptText }
+          ]
         })
       });
 
-      const data = await response.json();
-      const llmResult = data.choices[0].message.content.trim();
-      log(`NVIDIA NIM Response:\n"${llmResult}"`);
-      return llmResult;
+      const data = await res.json();
+      return data.choices[0].message.content.trim();
     } catch (err) {
-      log("NVIDIA NIM Error: " + err.message + "\nFallback to raw voice prompt.");
-      return userPrompt;
+      log("NIM Error: " + err.message);
+      return promptText;
     }
   }
 
-  // HTTP REST POST to ESP32-S3
-  async function sendCommandToEsp32(textCommand) {
+  async function sendToEsp32(cmd) {
     const ip = document.getElementById('espIp').value.trim();
-    if (!ip) return alert("Please enter your ESP32-S3 Local IP!");
-
-    log(`Sending command to http://${ip}/send-text ...`);
+    log(`Sending to ESP32: "${cmd}"`);
 
     try {
-      const response = await fetch(`http://${ip}/send-text`, {
+      const res = await fetch(`http://${ip}/send-text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textCommand })
+        body: JSON.stringify({ text: cmd })
       });
 
-      const result = await response.json();
-      log(`ESP32-S3 Executed Command:\n"${textCommand}"\n\nResponse:\n${JSON.stringify(result, null, 2)}`);
-
-      if (result.status === "success" && result.speech) {
-        await speakText(result.speech);
-      }
+      const result = await res.json();
+      log(`Response: ${result.speech}`);
+      speakOutLoud(result.speech);
     } catch (err) {
-      log(`Error reaching ESP32-S3: ${err.message}`);
-      await speakText("Failed to communicate with switchboard.");
+      log("ESP32 Communication Error!");
+      speakOutLoud("Failed to reach switchboard.");
     }
   }
 
-  // High-Quality Speech Feedback (OpenAI TTS with Web Speech Fallback)
-  async function speakText(textToSpeak) {
-    const openaiApiKey = document.getElementById('openaiKey').value.trim();
-
-    if (openaiApiKey) {
-      try {
-        log(`Generating OpenAI TTS speech for: "${textToSpeak}"`);
-        const response = await fetch("https://api.openai.com/v1/audio/speech", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${openaiApiKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "tts-1",
-            input: textToSpeak,
-            voice: "alloy"
-          })
-        });
-
-        if (!response.ok) throw new Error(`OpenAI HTTP ${response.status}`);
-
-        const blob = await response.blob();
-        const audioUrl = URL.createObjectURL(blob);
-        const audio = new Audio(audioUrl);
-        audio.play();
-        return;
-      } catch (err) {
-        log("OpenAI TTS failed: " + err.message + "\nFalling back to browser speech synthesis.");
-      }
-    }
-
-    // Fallback: Browser Web Speech Synthesis
+  function speakOutLoud(speechText) {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      const utterance = new SpeechSynthesisUtterance(speechText);
       window.speechSynthesis.speak(utterance);
     }
   }
 
   function log(msg) {
-    document.getElementById('logBox').innerText = msg;
+    document.getElementById('log').innerText = msg;
   }
 </script>
 
