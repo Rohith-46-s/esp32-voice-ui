@@ -56,7 +56,7 @@
       border: 1px solid #30363d;
       border-radius: 6px;
       padding: 10px;
-      height: 220px;
+      height: 240px;
       overflow-y: auto;
       font-family: monospace;
       font-size: 13px;
@@ -73,7 +73,7 @@
     <input type="text" id="espIp" value="10.93.188.65" placeholder="e.g. 10.93.188.65" />
 
     <label for="apiKey">NVIDIA NIM API Key (nvapi-...):</label>
-    <input type="password" id="apiKey" placeholder="Paste your nvapi-... key here" />
+    <input type="password" id="apiKey" value="nvapi-28Mfyh5xzSifLkXQiVCl8y1isbTAxxxxxxxxxR_ea-qQ6" placeholder="Paste your nvapi-... key" />
 
     <button id="micBtn" onclick="toggleListening()">Start Voice Assistant</button>
     <div id="status">Status: Idle</div>
@@ -90,7 +90,7 @@
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech Recognition is not supported on this browser. Please use Chrome.");
+      alert("Speech Recognition is not supported on this browser. Please use Chrome on Android/PC.");
     } else {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -140,7 +140,7 @@
       document.getElementById("status").innerText = "Processing: " + cmd;
       const espIp = document.getElementById("espIp").value.trim();
 
-      // Local Hardware Routing
+      // Hardware/Local Overrides
       let localCmd = "";
       if (cmd.includes("turn on socket one") || cmd.includes("turn on socket 1")) localCmd = "turn_on_socket_one";
       else if (cmd.includes("turn off socket one") || cmd.includes("turn off socket 1")) localCmd = "turn_off_socket_one";
@@ -156,17 +156,17 @@
           speak(text);
           log("ESP32 Response: " + text);
         } catch (e) {
-          speak("Could not reach ESP32 board.");
+          speak("Could not reach ESP32 board. Check Mixed Content permissions.");
           log("ESP32 Fetch Error: " + e.message);
         }
       } else {
-        // Route general LLM queries through ESP32-S3 proxy to bypass browser CORS
-        await askNvidiaViaESP32(cmd);
+        // Fallback to DeepSeek V4 Flash via ESP32 Proxy
+        await askDeepSeekViaESP32(cmd);
       }
       document.getElementById("status").innerText = "Status: Listening...";
     }
 
-    async function askNvidiaViaESP32(promptText) {
+    async function askDeepSeekViaESP32(promptText) {
       const apiKey = document.getElementById("apiKey").value.trim();
       const espIp = document.getElementById("espIp").value.trim();
 
@@ -186,13 +186,13 @@
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            model: "meta/llama-3.1-70b-instruct",
+            model: "deepseek-ai/deepseek-v4-flash-0731",
             messages: [
-              { role: "system", content: "You are JARVIS. Give very short 1-sentence answers for voice output." },
+              { role: "system", content: "You are JARVIS. Give very concise, 1-sentence responses suitable for speech synthesis." },
               { role: "user", content: promptText }
             ],
-            temperature: 0.5,
-            max_tokens: 100
+            temperature: 0.7,
+            max_tokens: 150
           })
         });
 
@@ -206,12 +206,19 @@
         let data = await response.json();
         if (data.choices && data.choices[0]) {
           let reply = data.choices[0].message.content;
+          
+          // Clean reasoning tokens (<think>...</think>) if returned by DeepSeek
+          reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
           speak(reply);
-          log("JARVIS (NVIDIA): " + reply);
+          log("JARVIS (DeepSeek): " + reply);
+        } else {
+          speak("Received empty response from API.");
+          log("API Warning: No choices array in output.");
         }
       } catch (err) {
         log("Proxy Connection Error: " + err.message);
-        speak("Unable to connect to ESP32 proxy. Ensure your device is on the same local network.");
+        speak("Unable to connect to ESP32 proxy. Verify site settings allow insecure content.");
       }
     }
 
