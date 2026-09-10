@@ -56,7 +56,7 @@
       border: 1px solid #30363d;
       border-radius: 6px;
       padding: 10px;
-      height: 180px;
+      height: 200px;
       overflow-y: auto;
       font-family: monospace;
       font-size: 13px;
@@ -70,10 +70,10 @@
     <h2>J.A.R.V.I.S. Control Panel</h2>
     
     <label for="espIp">ESP32-S3 IP Address:</label>
-    <input type="text" id="espIp" placeholder="e.g. 192.168.1.50" value="192.168.1.50" />
+    <input type="text" id="espIp" value="10.93.188.65" placeholder="e.g. 10.93.188.65" />
 
     <label for="apiKey">Llama-3.1 API Key (OpenRouter/Groq):</label>
-    <input type="password" id="apiKey" placeholder="Paste your API key here" />
+    <input type="password" id="apiKey" placeholder="Paste sk-or-... key here" />
 
     <button id="micBtn" onclick="toggleListening()">Start Voice Assistant</button>
     <div id="status">Status: Idle</div>
@@ -88,10 +88,9 @@
     let recognition;
     let isListening = false;
 
-    // Check Speech Recognition Support
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech Recognition API is not supported in this browser. Use Chrome/Safari on mobile.");
+      alert("Speech Recognition is not supported on this browser. Please use Chrome on Mobile/PC.");
     } else {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -103,19 +102,21 @@
         const transcript = event.results[lastIndex][0].transcript.toLowerCase().trim();
         log("Heard: " + transcript);
 
-        // Wake word detection
-        if (transcript.includes("jarvis")) {
-          const command = transcript.split("jarvis")[1].trim();
+        if (transcript.includes("jarvis") || transcript.includes("service") || transcript.includes("travis")) {
+          let command = transcript.replace(/jarvis|service|travis/g, "").trim();
           if (command.length > 0) {
             processCommand(command);
           } else {
             speak("Yes? I am listening.");
           }
+        } else {
+          // Process directly if user spoke a command without saying 'Jarvis' first
+          processCommand(transcript);
         }
       };
 
       recognition.onend = () => {
-        if (isListening) recognition.start(); // Auto-restart continuous listening
+        if (isListening) recognition.start();
       };
     }
 
@@ -125,8 +126,8 @@
         recognition.start();
         isListening = true;
         btn.classList.add("listening");
-        btn.innerText = "Listening for 'Jarvis'...";
-        document.getElementById("status").innerText = "Status: Listening...";
+        btn.innerText = "Listening...";
+        document.getElementById("status").innerText = "Status: Listening active";
       } else {
         recognition.stop();
         isListening = false;
@@ -137,37 +138,34 @@
     }
 
     async function processCommand(cmd) {
-      document.getElementById("status").innerText = "Processing command...";
+      document.getElementById("status").innerText = "Processing: " + cmd;
       const espIp = document.getElementById("espIp").value.trim();
 
-      // Offline Hardware/System Rule Matching
+      // Local Custom Overrides
+      if (cmd.includes("movie") || cmd.includes("highest collection") || cmd.includes("grossing")) {
+        speak("Dangal.");
+        log("JARVIS: Dangal");
+        return;
+      }
+      if (cmd.includes("paneer recipe") || cmd.includes("panner recipe")) {
+        const recipe = "Saute chopped onions, ginger, and garlic in butter. Add tomato puree, red chili powder, garam masala, and salt. Stir in cream and paneer cubes, then simmer for 5 minutes.";
+        speak(recipe);
+        log("JARVIS: " + recipe);
+        return;
+      }
+
+      // Offline ESP32 Commands
       let localCmd = "";
       if (cmd.includes("turn on socket one") || cmd.includes("turn on socket 1")) localCmd = "turn_on_socket_one";
       else if (cmd.includes("turn off socket one") || cmd.includes("turn off socket 1")) localCmd = "turn_off_socket_one";
       else if (cmd.includes("turn on socket two") || cmd.includes("turn on socket 2")) localCmd = "turn_on_socket_two";
       else if (cmd.includes("turn off socket two") || cmd.includes("turn off socket 2")) localCmd = "turn_off_socket_two";
-      else if (cmd.includes("turn off socket one after 2 hours") || cmd.includes("turn off socket 1 after 2 hours")) localCmd = "off_socket_one_2h";
-      else if (cmd.includes("turn on socket one at 9 am") || cmd.includes("turn on socket 1 at 9 am")) localCmd = "on_socket_one_9am";
       else if (cmd.includes("time")) localCmd = "get_time";
       else if (cmd.includes("date")) localCmd = "get_date";
       else if (cmd.includes("day")) localCmd = "get_day";
       else if (cmd.includes("temperature")) localCmd = "get_temperature";
       else if (cmd.includes("humidity")) localCmd = "get_humidity";
 
-      // Hardcoded local overrides for quick responses
-      if (cmd.includes("highest collection") && cmd.includes("india")) {
-        speak("Dangal.");
-        log("JARVIS: Dangal");
-        return;
-      }
-      if (cmd.includes("paneer recipe")) {
-        const recipe = "To make simple Paneer Butter Masala: Saute chopped onions, ginger, and garlic in butter. Add tomato puree and cook until oil separates. Mix in red chili powder, garam masala, and salt. Stir in fresh cream and paneer cubes. Simmer for 5 minutes and garnish with coriander.";
-        speak(recipe);
-        log("JARVIS: " + recipe);
-        return;
-      }
-
-      // Execute locally on ESP32 if command matches hardware controls
       if (localCmd !== "") {
         try {
           let res = await fetch(`http://${espIp}/cmd?cmd=${localCmd}`);
@@ -175,11 +173,11 @@
           speak(text);
           log("ESP32 Response: " + text);
         } catch (e) {
-          speak("Failed to connect to ESP32 board.");
-          log("Error: " + e.message);
+          speak("Could not connect to ESP32 at " + espIp);
+          log("ESP32 Fetch Error: " + e.message);
         }
       } else {
-        // Online fallback to Meta Llama 3.1 70B
+        // Fallback to Llama 3.1 API
         await askLlama(cmd);
       }
       document.getElementById("status").innerText = "Status: Listening...";
@@ -188,7 +186,7 @@
     async function askLlama(prompt) {
       const apiKey = document.getElementById("apiKey").value.trim();
       if (!apiKey) {
-        speak("Please enter your API key in the UI to ask general questions.");
+        speak("Command not recognized locally. Please enter your API key to query Llama.");
         return;
       }
 
@@ -202,24 +200,29 @@
           body: JSON.stringify({
             model: "meta-llama/llama-3.1-70b-instruct",
             messages: [
-              { role: "system", content: "You are Jarvis, a concise and direct voice assistant." },
+              { role: "system", content: "You are Jarvis. Give concise 1-sentence answers suitable for voice synthesis." },
               { role: "user", content: prompt }
             ]
           })
         });
 
         let data = await response.json();
-        let reply = data.choices[0].message.content;
-        speak(reply);
-        log("JARVIS (Llama): " + reply);
+        if (data.choices && data.choices[0]) {
+          let reply = data.choices[0].message.content;
+          speak(reply);
+          log("JARVIS (Llama): " + reply);
+        } else {
+          speak("API error response received.");
+          log("API Output Error: " + JSON.stringify(data));
+        }
       } catch (err) {
-        speak("I encountered an error reaching the Llama API.");
-        log("API Error: " + err.message);
+        speak("Unable to contact Llama API service.");
+        log("Network Error: " + err.message);
       }
     }
 
     function speak(text) {
-      window.speechSynthesis.cancel(); // Stop ongoing audio
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
