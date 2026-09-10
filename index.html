@@ -1,358 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JARVIS Interface</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JARVIS Voice Assistant</title>
   <style>
-    :root {
-      --cyan: #00f0ff;
-      --dark-bg: #050b14;
-      --panel-bg: rgba(10, 25, 47, 0.9);
-    }
-
     body {
-      margin: 0;
-      padding: 0;
-      background-color: var(--dark-bg);
-      color: var(--cyan);
-      font-family: 'Segoe UI', Roboto, monospace;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      overflow-x: hidden;
+      padding: 20px;
+      margin: 0;
     }
-
-    /* JARVIS Glowing Orb */
-    .jarvis-container {
-      position: relative;
-      width: 180px;
-      height: 180px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 1.5rem;
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      margin-bottom: 20px;
     }
-
-    .orb {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(0,240,255,0.9) 0%, rgba(0,100,150,0.4) 60%, rgba(0,0,0,0) 70%);
-      box-shadow: 0 0 40px var(--cyan), inset 0 0 20px var(--cyan);
-      animation: pulse 3s infinite ease-in-out;
-    }
-
-    .ring {
-      position: absolute;
-      border: 2px dashed var(--cyan);
-      border-radius: 50%;
-      animation: spin 10s linear infinite;
-    }
-
-    .ring-1 { width: 140px; height: 140px; border-width: 2px; }
-    .ring-2 { width: 170px; height: 170px; border-style: solid; border-color: rgba(0, 240, 255, 0.3) transparent; animation-duration: 6s; }
-
-    .listening .orb {
-      background: radial-gradient(circle, rgba(255,50,50,0.9) 0%, rgba(150,0,0,0.4) 60%, rgba(0,0,0,0) 70%);
-      box-shadow: 0 0 50px #ff3232, inset 0 0 20px #ff3232;
-    }
-
-    @keyframes pulse {
-      0%, 100% { transform: scale(0.98); opacity: 0.8; }
-      50% { transform: scale(1.05); opacity: 1; }
-    }
-
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    /* Control Panel */
-    .panel {
-      background: var(--panel-bg);
-      border: 1px solid var(--cyan);
-      box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
-      border-radius: 8px;
-      padding: 1.5rem;
-      width: 90%;
-      max-width: 500px;
-      text-align: center;
-    }
-
-    .status-text {
-      font-size: 0.9rem;
-      letter-spacing: 2px;
-      margin-bottom: 1rem;
-      text-transform: uppercase;
-    }
-
-    .settings-panel {
-      display: none;
-      background: rgba(0,0,0,0.6);
-      border: 1px dashed var(--cyan);
+    h2 { color: #58a6ff; margin-top: 0; text-align: center; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input {
+      width: 100%;
       padding: 10px;
-      margin-bottom: 12px;
-      border-radius: 4px;
-      text-align: left;
-    }
-
-    .settings-panel label {
-      font-size: 0.75rem;
-      display: block;
-      margin-top: 6px;
-    }
-
-    .settings-panel input {
-      width: 95%;
-      background: #000;
-      border: 1px solid var(--cyan);
+      margin-top: 5px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      background: #0d1117;
       color: #fff;
-      padding: 6px;
-      border-radius: 3px;
-      font-size: 0.8rem;
+      box-sizing: border-box;
     }
-
-    .input-group {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    input[type="text"] {
-      flex: 1;
-      background: rgba(0,0,0,0.5);
-      border: 1px solid var(--cyan);
-      padding: 10px;
-      color: #fff;
-      border-radius: 4px;
-      outline: none;
-    }
-
     button {
-      background: transparent;
-      border: 1px solid var(--cyan);
-      color: var(--cyan);
-      padding: 8px 14px;
-      cursor: pointer;
-      border-radius: 4px;
+      width: 100%;
+      padding: 12px;
+      margin-top: 15px;
+      background: #238636;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
       font-weight: bold;
-      transition: all 0.3s;
+      cursor: pointer;
     }
-
-    button:hover {
-      background: var(--cyan);
-      color: #000;
-      box-shadow: 0 0 10px var(--cyan);
-    }
-
-    .log-box {
-      margin-top: 12px;
-      height: 120px;
-      background: rgba(0,0,0,0.7);
-      border: 1px solid rgba(0, 240, 255, 0.3);
-      padding: 8px;
-      font-size: 0.85rem;
-      text-align: left;
+    button.listening { background: #da3633; }
+    #status { font-weight: bold; text-align: center; margin-top: 10px; color: #8b949e; }
+    #log {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px;
+      height: 180px;
       overflow-y: auto;
-      color: #a0f0ff;
+      font-family: monospace;
+      font-size: 13px;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
 
-  <div class="jarvis-container" id="jarvisUI">
-    <div class="ring ring-2"></div>
-    <div class="ring ring-1"></div>
-    <div class="orb"></div>
+  <div class="card">
+    <h2>J.A.R.V.I.S. Control Panel</h2>
+    
+    <label for="espIp">ESP32-S3 IP Address:</label>
+    <input type="text" id="espIp" placeholder="e.g. 192.168.1.50" value="192.168.1.50" />
+
+    <label for="apiKey">Llama-3.1 API Key (OpenRouter/Groq):</label>
+    <input type="password" id="apiKey" placeholder="Paste your API key here" />
+
+    <button id="micBtn" onclick="toggleListening()">Start Voice Assistant</button>
+    <div id="status">Status: Idle</div>
   </div>
 
-  <div class="panel">
-    <div class="status-text" id="statusLabel">JARVIS System Online</div>
-
-    <button onclick="toggleSettings()" style="margin-bottom: 8px; font-size: 0.8rem;">⚙️ Settings</button>
-
-    <!-- Configuration Settings Form -->
-    <div class="settings-panel" id="settingsPanel">
-      <label>ESP32 IP Address (e.g. 192.168.1.15):</label>
-      <input type="text" id="espIpInput" placeholder="192.168.1.XX">
-      
-      <label>NVIDIA NIM API Key (nvapi-...):</label>
-      <input type="password" id="nimKeyInput" placeholder="nvapi-...">
-      
-      <button onclick="saveSettings()" style="margin-top: 8px; width: 100%;">Save Credentials</button>
-    </div>
-    
-    <div class="input-group">
-      <input type="text" id="commandInput" placeholder="Ask JARVIS or give command...">
-      <button onclick="processInput()">Send</button>
-      <button onclick="toggleVoice()">🎙️</button>
-    </div>
-
-    <div class="log-box" id="logBox">
-      <div>[SYSTEM]: Ready for instructions. Verify IP & API Key in Settings.</div>
-    </div>
+  <div class="card">
+    <h3>Activity Log</h3>
+    <div id="log">Say "Jarvis" followed by your command...</div>
   </div>
 
   <script>
-    const speechSynth = window.speechSynthesis;
     let recognition;
+    let isListening = false;
 
-    const localKeywords = ["socket", "relay", "time", "date", "temp", "temperature", "humidity", "today"];
-
-    window.onload = () => {
-      if (localStorage.getItem("jarvis_esp_ip")) {
-        document.getElementById("espIpInput").value = localStorage.getItem("jarvis_esp_ip");
-      }
-      if (localStorage.getItem("jarvis_nim_key")) {
-        document.getElementById("nimKeyInput").value = localStorage.getItem("jarvis_nim_key");
-      }
-    };
-
-    function toggleSettings() {
-      const panel = document.getElementById("settingsPanel");
-      panel.style.display = panel.style.display === "block" ? "none" : "block";
-    }
-
-    function saveSettings() {
-      const ip = document.getElementById("espIpInput").value.trim().replace("http://", "").replace("/", "");
-      const key = document.getElementById("nimKeyInput").value.trim();
-      
-      localStorage.setItem("jarvis_esp_ip", ip);
-      localStorage.setItem("jarvis_nim_key", key);
-      
-      log("Configuration saved successfully.");
-      toggleSettings();
-    }
-
-    function log(msg) {
-      const box = document.getElementById("logBox");
-      box.innerHTML += `<div>> ${msg}</div>`;
-      box.scrollTop = box.scrollHeight;
-    }
-
-    function speak(text) {
-      if (!text) return;
-      speechSynth.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.pitch = 0.9;
-      utterance.rate = 1.0;
-      speechSynth.speak(utterance);
-    }
-
-    function isHardwareCommand(text) {
-      const lower = text.toLowerCase();
-      return localKeywords.some(kw => lower.includes(kw));
-    }
-
-    async function processInput() {
-      const inputEl = document.getElementById("commandInput");
-      const text = inputEl.value.trim();
-      if (!text) return;
-
-      inputEl.value = "";
-      log(`User: "${text}"`);
-
-      if (isHardwareCommand(text)) {
-        await sendToESP32(text);
-      } else {
-        await queryNvidiaNIM(text);
-      }
-    }
-
-    async function sendToESP32(commandText) {
-      const ip = localStorage.getItem("jarvis_esp_ip");
-      if (!ip) {
-        log("ERROR: ESP32 IP not set! Configure in Settings.");
-        speak("Please set the ESP32 IP address in settings.");
-        return;
-      }
-
-      const url = `http://${ip}/send-text`;
-      log(`Routing hardware command to ${url}...`);
-
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: commandText })
-        });
-        const data = await res.json();
-        log(`JARVIS: ${data.speech}`);
-        speak(data.speech);
-      } catch (err) {
-        log(`ESP32 Connection Error (${err.message})`);
-        speak("Failed to connect to local hardware controller.");
-      }
-    }
-
-    async function queryNvidiaNIM(promptText) {
-      const ip = localStorage.getItem("jarvis_esp_ip");
-      const key = localStorage.getItem("jarvis_nim_key");
-
-      if (!ip || !key) {
-        log("ERROR: ESP32 IP or NVIDIA API Key missing in Settings!");
-        speak("Please configure your ESP32 IP and NVIDIA API key in settings.");
-        return;
-      }
-
-      const proxyUrl = `http://${ip}/nvidia-proxy`;
-      log(`Routing query through ESP32 proxy to NVIDIA NIM...`);
-
-      try {
-        const response = await fetch(proxyUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            apiKey: key,
-            prompt: promptText
-          })
-        });
-
-        const result = await response.json();
-        
-        if (result.choices && result.choices.length > 0) {
-          const reply = result.choices[0].message.content;
-          log(`JARVIS: ${reply}`);
-          speak(reply);
-        } else {
-          log("NVIDIA API Error: Check if API key is valid.");
-          speak("The cloud service returned an authorization error.");
-        }
-      } catch (err) {
-        log(`Network Error (${err.message})`);
-        speak("Unable to reach cloud intelligence via ESP32 proxy.");
-      }
-    }
-
-    // Speech Recognition Setup
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // Check Speech Recognition Support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech Recognition API is not supported in this browser. Use Chrome/Safari on mobile.");
+    } else {
       recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = false;
+      recognition.lang = 'en-US';
 
-      recognition.onstart = () => {
-        document.getElementById("jarvisUI").classList.add("listening");
-        document.getElementById("statusLabel").innerText = "JARVIS Listening...";
+      recognition.onresult = async (event) => {
+        const lastIndex = event.results.length - 1;
+        const transcript = event.results[lastIndex][0].transcript.toLowerCase().trim();
+        log("Heard: " + transcript);
+
+        // Wake word detection
+        if (transcript.includes("jarvis")) {
+          const command = transcript.split("jarvis")[1].trim();
+          if (command.length > 0) {
+            processCommand(command);
+          } else {
+            speak("Yes? I am listening.");
+          }
+        }
       };
 
       recognition.onend = () => {
-        document.getElementById("jarvisUI").classList.remove("listening");
-        document.getElementById("statusLabel").innerText = "JARVIS System Online";
-      };
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        document.getElementById("commandInput").value = transcript;
-        processInput();
+        if (isListening) recognition.start(); // Auto-restart continuous listening
       };
     }
 
-    function toggleVoice() {
-      if (recognition) recognition.start();
+    function toggleListening() {
+      const btn = document.getElementById("micBtn");
+      if (!isListening) {
+        recognition.start();
+        isListening = true;
+        btn.classList.add("listening");
+        btn.innerText = "Listening for 'Jarvis'...";
+        document.getElementById("status").innerText = "Status: Listening...";
+      } else {
+        recognition.stop();
+        isListening = false;
+        btn.classList.remove("listening");
+        btn.innerText = "Start Voice Assistant";
+        document.getElementById("status").innerText = "Status: Idle";
+      }
+    }
+
+    async function processCommand(cmd) {
+      document.getElementById("status").innerText = "Processing command...";
+      const espIp = document.getElementById("espIp").value.trim();
+
+      // Offline Hardware/System Rule Matching
+      let localCmd = "";
+      if (cmd.includes("turn on socket one") || cmd.includes("turn on socket 1")) localCmd = "turn_on_socket_one";
+      else if (cmd.includes("turn off socket one") || cmd.includes("turn off socket 1")) localCmd = "turn_off_socket_one";
+      else if (cmd.includes("turn on socket two") || cmd.includes("turn on socket 2")) localCmd = "turn_on_socket_two";
+      else if (cmd.includes("turn off socket two") || cmd.includes("turn off socket 2")) localCmd = "turn_off_socket_two";
+      else if (cmd.includes("turn off socket one after 2 hours") || cmd.includes("turn off socket 1 after 2 hours")) localCmd = "off_socket_one_2h";
+      else if (cmd.includes("turn on socket one at 9 am") || cmd.includes("turn on socket 1 at 9 am")) localCmd = "on_socket_one_9am";
+      else if (cmd.includes("time")) localCmd = "get_time";
+      else if (cmd.includes("date")) localCmd = "get_date";
+      else if (cmd.includes("day")) localCmd = "get_day";
+      else if (cmd.includes("temperature")) localCmd = "get_temperature";
+      else if (cmd.includes("humidity")) localCmd = "get_humidity";
+
+      // Hardcoded local overrides for quick responses
+      if (cmd.includes("highest collection") && cmd.includes("india")) {
+        speak("Dangal.");
+        log("JARVIS: Dangal");
+        return;
+      }
+      if (cmd.includes("paneer recipe")) {
+        const recipe = "To make simple Paneer Butter Masala: Saute chopped onions, ginger, and garlic in butter. Add tomato puree and cook until oil separates. Mix in red chili powder, garam masala, and salt. Stir in fresh cream and paneer cubes. Simmer for 5 minutes and garnish with coriander.";
+        speak(recipe);
+        log("JARVIS: " + recipe);
+        return;
+      }
+
+      // Execute locally on ESP32 if command matches hardware controls
+      if (localCmd !== "") {
+        try {
+          let res = await fetch(`http://${espIp}/cmd?cmd=${localCmd}`);
+          let text = await res.text();
+          speak(text);
+          log("ESP32 Response: " + text);
+        } catch (e) {
+          speak("Failed to connect to ESP32 board.");
+          log("Error: " + e.message);
+        }
+      } else {
+        // Online fallback to Meta Llama 3.1 70B
+        await askLlama(cmd);
+      }
+      document.getElementById("status").innerText = "Status: Listening...";
+    }
+
+    async function askLlama(prompt) {
+      const apiKey = document.getElementById("apiKey").value.trim();
+      if (!apiKey) {
+        speak("Please enter your API key in the UI to ask general questions.");
+        return;
+      }
+
+      try {
+        let response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "meta-llama/llama-3.1-70b-instruct",
+            messages: [
+              { role: "system", content: "You are Jarvis, a concise and direct voice assistant." },
+              { role: "user", content: prompt }
+            ]
+          })
+        });
+
+        let data = await response.json();
+        let reply = data.choices[0].message.content;
+        speak(reply);
+        log("JARVIS (Llama): " + reply);
+      } catch (err) {
+        speak("I encountered an error reaching the Llama API.");
+        log("API Error: " + err.message);
+      }
+    }
+
+    function speak(text) {
+      window.speechSynthesis.cancel(); // Stop ongoing audio
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function log(msg) {
+      const logDiv = document.getElementById("log");
+      logDiv.innerHTML += `<div>> ${msg}</div>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
     }
   </script>
 </body>
