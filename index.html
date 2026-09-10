@@ -90,7 +90,7 @@
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech Recognition API is not supported on this browser. Please use Chrome.");
+      alert("Speech Recognition is not supported on this browser. Please use Chrome.");
     } else {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -140,25 +140,19 @@
       document.getElementById("status").innerText = "Processing: " + cmd;
       const espIp = document.getElementById("espIp").value.trim();
 
-      // Quick Local Commands
+      // Local Hardware Routing
       let localCmd = "";
       if (cmd.includes("turn on socket one") || cmd.includes("turn on socket 1")) localCmd = "turn_on_socket_one";
       else if (cmd.includes("turn off socket one") || cmd.includes("turn off socket 1")) localCmd = "turn_off_socket_one";
       else if (cmd.includes("turn on socket two") || cmd.includes("turn on socket 2")) localCmd = "turn_on_socket_two";
       else if (cmd.includes("turn off socket two") || cmd.includes("turn off socket 2")) localCmd = "turn_off_socket_two";
       else if (cmd.includes("time")) localCmd = "get_time";
-      else if (cmd.includes("date")) localCmd = "get_date";
-      else if (cmd.includes("day")) localCmd = "get_day";
       else if (cmd.includes("temperature")) localCmd = "get_temperature";
-      else if (cmd.includes("humidity")) localCmd = "get_humidity";
 
       if (localCmd !== "") {
         try {
           let res = await fetch(`http://${espIp}/cmd?cmd=${localCmd}`);
           let text = await res.text();
-          if (text.includes("Error reading")) {
-            text = "The temperature sensor is currently disconnected.";
-          }
           speak(text);
           log("ESP32 Response: " + text);
         } catch (e) {
@@ -166,34 +160,35 @@
           log("ESP32 Fetch Error: " + e.message);
         }
       } else {
-        // Fallback to NVIDIA NIM Llama 3.1 70B API
-        await askNvidiaNIM(cmd);
+        // Route general LLM queries through ESP32-S3 proxy to bypass browser CORS
+        await askNvidiaViaESP32(cmd);
       }
       document.getElementById("status").innerText = "Status: Listening...";
     }
 
-    async function askNvidiaNIM(promptText) {
+    async function askNvidiaViaESP32(promptText) {
       const apiKey = document.getElementById("apiKey").value.trim();
+      const espIp = document.getElementById("espIp").value.trim();
+
       if (!apiKey) {
         speak("Please enter your NVIDIA API key.");
         log("NVIDIA Error: API Key missing.");
         return;
       }
 
-      const endpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
+      const proxyEndpoint = `http://${espIp}/nvidia`;
 
       try {
-        let response = await fetch(endpoint, {
+        let response = await fetch(proxyEndpoint, {
           method: "POST",
           headers: {
-            "Accept": "application/json",
             "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
             model: "meta/llama-3.1-70b-instruct",
             messages: [
-              { role: "system", content: "You are JARVIS. Respond in 1 short sentence suitable for speech." },
+              { role: "system", content: "You are JARVIS. Give very short 1-sentence answers for voice output." },
               { role: "user", content: promptText }
             ],
             temperature: 0.5,
@@ -202,9 +197,9 @@
         });
 
         if (!response.ok) {
-          let errData = await response.json();
-          log("API Error Status: " + response.status + " - " + JSON.stringify(errData));
-          speak("NVIDIA API error " + response.status);
+          let errData = await response.text();
+          log("Proxy Error (" + response.status + "): " + errData);
+          speak("Error processing request through ESP32 proxy.");
           return;
         }
 
@@ -215,8 +210,8 @@
           log("JARVIS (NVIDIA): " + reply);
         }
       } catch (err) {
-        log("Network Error: " + err.message);
-        speak("Network error calling NVIDIA service. Check internet connection or CORS settings.");
+        log("Proxy Connection Error: " + err.message);
+        speak("Unable to connect to ESP32 proxy. Ensure your device is on the same local network.");
       }
     }
 
