@@ -90,7 +90,7 @@
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech Recognition API is not supported on this browser. Please use Chrome on Android/PC.");
+      alert("Speech Recognition API is not supported on this browser. Please use Chrome.");
     } else {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -140,20 +140,7 @@
       document.getElementById("status").innerText = "Processing: " + cmd;
       const espIp = document.getElementById("espIp").value.trim();
 
-      // Quick Local Custom Overrides
-      if (cmd.includes("movie") || cmd.includes("highest collection") || cmd.includes("grossing")) {
-        speak("Dangal.");
-        log("JARVIS: Dangal");
-        return;
-      }
-      if (cmd.includes("paneer recipe") || cmd.includes("panner recipe")) {
-        const recipe = "Saute chopped onions, ginger, and garlic in butter. Add tomato puree, red chili powder, garam masala, and salt. Stir in cream and paneer cubes, then simmer for 5 minutes.";
-        speak(recipe);
-        log("JARVIS: " + recipe);
-        return;
-      }
-
-      // Hardware/Sensor Commands
+      // Quick Local Commands
       let localCmd = "";
       if (cmd.includes("turn on socket one") || cmd.includes("turn on socket 1")) localCmd = "turn_on_socket_one";
       else if (cmd.includes("turn off socket one") || cmd.includes("turn off socket 1")) localCmd = "turn_off_socket_one";
@@ -169,15 +156,13 @@
         try {
           let res = await fetch(`http://${espIp}/cmd?cmd=${localCmd}`);
           let text = await res.text();
-          
           if (text.includes("Error reading")) {
             text = "The temperature sensor is currently disconnected.";
           }
-          
           speak(text);
           log("ESP32 Response: " + text);
         } catch (e) {
-          speak("Could not reach ESP32 controller.");
+          speak("Could not reach ESP32 board.");
           log("ESP32 Fetch Error: " + e.message);
         }
       } else {
@@ -187,44 +172,51 @@
       document.getElementById("status").innerText = "Status: Listening...";
     }
 
-    async function askNvidiaNIM(prompt) {
+    async function askNvidiaNIM(promptText) {
       const apiKey = document.getElementById("apiKey").value.trim();
       if (!apiKey) {
-        speak("Please enter your NVIDIA API key in the user interface.");
+        speak("Please enter your NVIDIA API key.");
         log("NVIDIA Error: API Key missing.");
         return;
       }
 
+      const endpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
+
       try {
-        let response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        let response = await fetch(endpoint, {
           method: "POST",
           headers: {
+            "Accept": "application/json",
             "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
             model: "meta/llama-3.1-70b-instruct",
             messages: [
-              { role: "system", content: "You are JARVIS. Give very concise, direct 1-sentence answers suitable for voice playback." },
-              { role: "user", content: prompt }
+              { role: "system", content: "You are JARVIS. Respond in 1 short sentence suitable for speech." },
+              { role: "user", content: promptText }
             ],
             temperature: 0.5,
             max_tokens: 100
           })
         });
 
+        if (!response.ok) {
+          let errData = await response.json();
+          log("API Error Status: " + response.status + " - " + JSON.stringify(errData));
+          speak("NVIDIA API error " + response.status);
+          return;
+        }
+
         let data = await response.json();
         if (data.choices && data.choices[0]) {
           let reply = data.choices[0].message.content;
           speak(reply);
           log("JARVIS (NVIDIA): " + reply);
-        } else if (data.error) {
-          speak("NVIDIA authentication error. Check your API key.");
-          log("NVIDIA API Error: " + data.error.message);
         }
       } catch (err) {
-        speak("Unable to reach NVIDIA NIM service.");
         log("Network Error: " + err.message);
+        speak("Network error calling NVIDIA service. Check internet connection or CORS settings.");
       }
     }
 
