@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JARVIS Voice Assistant</title>
+  <title>JARVIS Voice Controller</title>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: #0d1117;
       color: #c9d1d9;
       display: flex;
@@ -21,26 +21,27 @@
       border-radius: 12px;
       padding: 20px;
       width: 100%;
-      max-width: 480px;
+      max-width: 500px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       margin-bottom: 20px;
     }
     h2 { color: #58a6ff; margin-top: 0; text-align: center; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
+    label { display: block; margin-top: 12px; font-weight: bold; font-size: 14px; }
     input {
       width: 100%;
       padding: 10px;
-      margin-top: 5px;
+      margin-top: 6px;
       border-radius: 6px;
       border: 1px solid #30363d;
       background: #0d1117;
-      color: #fff;
+      color: #58a6ff;
       box-sizing: border-box;
+      font-family: monospace;
     }
     button {
       width: 100%;
-      padding: 12px;
-      margin-top: 15px;
+      padding: 14px;
+      margin-top: 20px;
       background: #238636;
       color: white;
       border: none;
@@ -50,37 +51,35 @@
       cursor: pointer;
     }
     button.listening { background: #da3633; }
-    #status { font-weight: bold; text-align: center; margin-top: 10px; color: #8b949e; }
+    #status { font-weight: bold; text-align: center; margin-top: 15px; color: #8b949e; }
     #log {
       background: #0d1117;
       border: 1px solid #30363d;
       border-radius: 6px;
       padding: 10px;
-      height: 240px;
+      height: 250px;
       overflow-y: auto;
       font-family: monospace;
       font-size: 13px;
       margin-top: 10px;
+      color: #79c0ff;
     }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <h2>J.A.R.V.I.S. Control Panel</h2>
+    <h2>JARVIS Voice Interface</h2>
     
-    <label for="espIp">ESP32-S3 IP Address:</label>
-    <input type="text" id="espIp" value="10.93.188.65" placeholder="e.g. 10.93.188.65" />
+    <label for="ngrokUrl">ngrok HTTPS Base URL:</label>
+    <input type="text" id="ngrokUrl" value="https://your-ngrok-subdomain.ngrok-free.app" placeholder="https://xxxx.ngrok-free.app" />
 
-    <label for="apiKey">NVIDIA NIM API Key (nvapi-...):</label>
-    <input type="password" id="apiKey" value="nvapi-28Mfyh5xzSifLkXQiVCl8y1isbTAxxxxxxxxxR_ea-qQ6" placeholder="Paste your nvapi-... key" />
-
-    <button id="micBtn" onclick="toggleListening()">Start Voice Assistant</button>
+    <button id="micBtn" onclick="toggleListening()">Start Voice Recognition</button>
     <div id="status">Status: Idle</div>
   </div>
 
   <div class="card">
-    <h3>Activity Log</h3>
+    <h3>Terminal Log</h3>
     <div id="log">Say "Jarvis" followed by your command...</div>
   </div>
 
@@ -90,7 +89,7 @@
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech Recognition is not supported on this browser. Please use Chrome on Android/PC.");
+      alert("Speech Recognition is not supported in this browser. Use Google Chrome.");
     } else {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -102,15 +101,15 @@
         const transcript = event.results[lastIndex][0].transcript.toLowerCase().trim();
         log("Heard: " + transcript);
 
-        if (transcript.includes("jarvis") || transcript.includes("service") || transcript.includes("travis")) {
-          let command = transcript.replace(/jarvis|service|travis/g, "").trim();
-          if (command.length > 0) {
-            processCommand(command);
-          } else {
-            speak("Yes? I am listening.");
-          }
+        let command = transcript;
+        if (transcript.includes("jarvis")) {
+          command = transcript.replace(/jarvis/g, "").trim();
+        }
+
+        if (command.length > 0) {
+          await sendCommandToESP32(command);
         } else {
-          processCommand(transcript);
+          speak("Yes? I am listening.");
         }
       };
 
@@ -125,100 +124,50 @@
         recognition.start();
         isListening = true;
         btn.classList.add("listening");
-        btn.innerText = "Listening...";
-        document.getElementById("status").innerText = "Status: Listening active";
+        btn.innerText = "Stop Listening";
+        document.getElementById("status").innerText = "Status: Listening...";
       } else {
         recognition.stop();
         isListening = false;
         btn.classList.remove("listening");
-        btn.innerText = "Start Voice Assistant";
+        btn.innerText = "Start Voice Recognition";
         document.getElementById("status").innerText = "Status: Idle";
       }
     }
 
-    async function processCommand(cmd) {
-      document.getElementById("status").innerText = "Processing: " + cmd;
-      const espIp = document.getElementById("espIp").value.trim();
+    async function sendCommandToESP32(cmdText) {
+      let baseUrl = document.getElementById("ngrokUrl").value.trim();
+      if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1);
 
-      // Hardware/Local Overrides
-      let localCmd = "";
-      if (cmd.includes("turn on socket one") || cmd.includes("turn on socket 1")) localCmd = "turn_on_socket_one";
-      else if (cmd.includes("turn off socket one") || cmd.includes("turn off socket 1")) localCmd = "turn_off_socket_one";
-      else if (cmd.includes("turn on socket two") || cmd.includes("turn on socket 2")) localCmd = "turn_on_socket_two";
-      else if (cmd.includes("turn off socket two") || cmd.includes("turn off socket 2")) localCmd = "turn_off_socket_two";
-      else if (cmd.includes("time")) localCmd = "get_time";
-      else if (cmd.includes("temperature")) localCmd = "get_temperature";
-
-      if (localCmd !== "") {
-        try {
-          let res = await fetch(`http://${espIp}/cmd?cmd=${localCmd}`);
-          let text = await res.text();
-          speak(text);
-          log("ESP32 Response: " + text);
-        } catch (e) {
-          speak("Could not reach ESP32 board. Check Mixed Content permissions.");
-          log("ESP32 Fetch Error: " + e.message);
-        }
-      } else {
-        // Fallback to DeepSeek V4 Flash via ESP32 Proxy
-        await askDeepSeekViaESP32(cmd);
-      }
-      document.getElementById("status").innerText = "Status: Listening...";
-    }
-
-    async function askDeepSeekViaESP32(promptText) {
-      const apiKey = document.getElementById("apiKey").value.trim();
-      const espIp = document.getElementById("espIp").value.trim();
-
-      if (!apiKey) {
-        speak("Please enter your NVIDIA API key.");
-        log("NVIDIA Error: API Key missing.");
-        return;
-      }
-
-      const proxyEndpoint = `http://${espIp}/nvidia`;
+      const endpoint = `${baseUrl}/command`;
+      document.getElementById("status").innerText = "Sending to ESP32...";
 
       try {
-        let response = await fetch(proxyEndpoint, {
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true" // Bypass ngrok warning page
           },
-          body: JSON.stringify({
-            model: "deepseek-ai/deepseek-v4-flash-0731",
-            messages: [
-              { role: "system", content: "You are JARVIS. Give very concise, 1-sentence responses suitable for speech synthesis." },
-              { role: "user", content: promptText }
-            ],
-            temperature: 0.7,
-            max_tokens: 150
-          })
+          body: JSON.stringify({ command: cmdText })
         });
 
         if (!response.ok) {
-          let errData = await response.text();
-          log("Proxy Error (" + response.status + "): " + errData);
-          speak("Error processing request through ESP32 proxy.");
+          log(`Error (${response.status}): Failed to route command to ESP32.`);
+          speak("Command routing failed.");
           return;
         }
 
-        let data = await response.json();
-        if (data.choices && data.choices[0]) {
-          let reply = data.choices[0].message.content;
-          
-          // Clean reasoning tokens (<think>...</think>) if returned by DeepSeek
-          reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+        const data = await response.json();
+        const reply = data.reply;
 
-          speak(reply);
-          log("JARVIS (DeepSeek): " + reply);
-        } else {
-          speak("Received empty response from API.");
-          log("API Warning: No choices array in output.");
-        }
+        log("ESP32 Output: " + reply);
+        speak(reply);
       } catch (err) {
-        log("Proxy Connection Error: " + err.message);
-        speak("Unable to connect to ESP32 proxy. Verify site settings allow insecure content.");
+        log("Connection Error: " + err.message);
+        speak("Unable to contact ESP32 via ngrok endpoint.");
+      } finally {
+        document.getElementById("status").innerText = "Status: Listening...";
       }
     }
 
