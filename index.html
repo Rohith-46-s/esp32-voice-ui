@@ -9,176 +9,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: #0d1117;
       color: #c9d1d9;
-      display: flex;<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32-S3 Voice & AI Controller</title>
-  <style>
-    :root {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
-      --accent: #38bdf8;
-      --text: #f8fafc;
-      --text-dim: #94a3b8;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text);
       display: flex;
-      justify-content: center;
-      padding: 2rem;
-      margin: 0;
-    }
-    .container {
-      width: 100%;
-      max-width: 600px;
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 1.5rem;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    }
-    h2 { margin-top: 0; color: var(--accent); }
-    .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.9rem;
-      margin-bottom: 1rem;
-    }
-    .indicator {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #ef4444;
-    }
-    .indicator.online { background: #22c55e; }
-    .input-group {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-    input[type="text"] {
-      flex: 1;
-      padding: 0.75rem;
-      border-radius: 6px;
-      border: 1px solid #334155;
-      background: #0f172a;
-      color: #fff;
-    }
-    button {
-      padding: 0.75rem 1.25rem;
-      border-radius: 6px;
-      border: none;
-      background: var(--accent);
-      color: #0f172a;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .response-box {
-      background: #0f172a;
-      border-radius: 6px;
-      padding: 1rem;
-      min-height: 120px;
-      white-space: pre-wrap;
-      color: var(--text-dim);
-      border: 1px solid #334155;
-    }
-  </style>
-</head>
-<body>
-
-<div class="container">
-  <h2>ESP32-S3 Direct AI Gateway</h2>
-  
-  <div class="status-bar">
-    <div id="statusIndicator" class="indicator"></div>
-    <span id="statusText">Disconnected</span>
-  </div>
-
-  <div class="input-group">
-    <input type="text" id="espIp" placeholder="ESP32 IP (e.g. 10.93.188.65)" value="10.93.188.65">
-    <button onclick="connectWS()">Connect</button>
-  </div>
-
-  <div class="input-group">
-    <input type="text" id="promptInput" placeholder="Enter command or voice transcript..." disabled>
-    <button id="sendBtn" onclick="sendPrompt()" disabled>Send</button>
-  </div>
-
-  <h4>ESP32 / NVIDIA Output:</h4>
-  <div id="outputLog" class="response-box">Awaiting connection...</div>
-</div>
-
-<script>
-  let socket = null;
-
-  function connectWS() {
-    const ip = document.getElementById('espIp').value.trim();
-    if (!ip) return alert("Please enter your ESP32 IP");
-
-    const wsUrl = `ws://${ip}/ws`;
-    updateStatus(false, `Connecting to ${wsUrl}...`);
-
-    socket = new WebSocket(wsUrl);
-
-    socket.onopen = () => {
-      updateStatus(true, "Connected to ESP32-S3");
-      document.getElementById('promptInput').disabled = false;
-      document.getElementById('sendBtn').disabled = false;
-    };
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      const log = document.getElementById('outputLog');
-
-      if (data.status === 'processing') {
-        log.textContent = `[ESP32]: ${data.message}`;
-      } else if (data.status === 'success') {
-        log.textContent = data.response;
-      } else {
-        log.textContent = JSON.stringify(data, null, 2);
-      }
-    };
-
-    socket.onerror = (err) => {
-      console.error("WebSocket Error:", err);
-      updateStatus(false, "Connection Error");
-    };
-
-    socket.onclose = () => {
-      updateStatus(false, "Disconnected");
-      document.getElementById('promptInput').disabled = true;
-      document.getElementById('sendBtn').disabled = true;
-    };
-  }
-
-  function sendPrompt() {
-    const prompt = document.getElementById('promptInput').value.trim();
-    if (socket && socket.readyState === WebSocket.OPEN && prompt) {
-      document.getElementById('outputLog').textContent = "Sending prompt to ESP32...";
-      socket.send(prompt);
-      document.getElementById('promptInput').value = '';
-    }
-  }
-
-  function updateStatus(isOnline, text) {
-    const indicator = document.getElementById('statusIndicator');
-    const statusText = document.getElementById('statusText');
-    statusText.textContent = text;
-    if (isOnline) {
-      indicator.classList.add('online');
-    } else {
-      indicator.classList.remove('online');
-    }
-  }
-</script>
-
-</body>
-</html>
       flex-direction: column;
       align-items: center;
       padding: 20px;
@@ -193,8 +24,9 @@
       max-width: 500px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       margin-bottom: 20px;
+      box-sizing: border-box;
     }
-    h2 { color: #58a6ff; margin-top: 0; text-align: center; }
+    h2, h3 { color: #58a6ff; margin-top: 0; text-align: center; }
     label { display: block; margin-top: 12px; font-weight: bold; font-size: 14px; }
     input {
       width: 100%;
@@ -240,8 +72,8 @@
   <div class="card">
     <h2>JARVIS Voice Interface</h2>
     
-    <label for="ngrokUrl">ngrok HTTPS Base URL:</label>
-    <input type="text" id="ngrokUrl" value="https://your-ngrok-subdomain.ngrok-free.app" placeholder="https://xxxx.ngrok-free.app" />
+    <label for="serverUrl">ngrok HTTPS Base URL / Target IP:</label>
+    <input type="text" id="serverUrl" value="https://your-ngrok-subdomain.ngrok-free.app" placeholder="https://xxxx.ngrok-free.app or http://10.93.188.65" />
 
     <button id="micBtn" onclick="toggleListening()">Start Voice Recognition</button>
     <div id="status">Status: Idle</div>
@@ -258,7 +90,7 @@
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech Recognition is not supported in this browser. Use Google Chrome.");
+      alert("Speech Recognition is supported in Chrome.");
     } else {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -305,36 +137,36 @@
     }
 
     async function sendCommandToESP32(cmdText) {
-      let baseUrl = document.getElementById("ngrokUrl").value.trim();
+      let baseUrl = document.getElementById("serverUrl").value.trim();
       if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1);
 
       const endpoint = `${baseUrl}/command`;
-      document.getElementById("status").innerText = "Sending to ESP32...";
+      document.getElementById("status").innerText = "Processing command...";
 
       try {
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true" // Bypass ngrok warning page
+            "ngrok-skip-browser-warning": "true"
           },
           body: JSON.stringify({ command: cmdText })
         });
 
         if (!response.ok) {
-          log(`Error (${response.status}): Failed to route command to ESP32.`);
-          speak("Command routing failed.");
+          log(`Error (${response.status}): Failed to route command.`);
+          speak("Command execution failed.");
           return;
         }
 
         const data = await response.json();
         const reply = data.reply;
 
-        log("ESP32 Output: " + reply);
+        log("JARVIS: " + reply);
         speak(reply);
       } catch (err) {
         log("Connection Error: " + err.message);
-        speak("Unable to contact ESP32 via ngrok endpoint.");
+        speak("Unable to contact ESP32 endpoint.");
       } finally {
         document.getElementById("status").innerText = "Status: Listening...";
       }
