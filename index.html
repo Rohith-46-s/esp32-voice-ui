@@ -72,8 +72,8 @@
   <div class="card">
     <h2>JARVIS Voice Interface</h2>
     
-    <label for="serverUrl">ngrok HTTPS Base URL / Target IP:</label>
-    <input type="text" id="serverUrl" value="https://your-ngrok-subdomain.ngrok-free.app" placeholder="https://xxxx.ngrok-free.app or http://10.93.188.65" />
+    <label for="serverUrl">ESP32 Local Target URL:</label>
+    <input type="text" id="serverUrl" value="http://192.168.1.50" placeholder="http://192.168.x.x" />
 
     <button id="micBtn" onclick="toggleListening()">Start Voice Recognition</button>
     <div id="status">Status: Idle</div>
@@ -90,7 +90,7 @@
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech Recognition is supported in Chrome.");
+      alert("Speech Recognition requires Google Chrome.");
     } else {
       recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -147,8 +147,7 @@
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true"
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({ command: cmdText })
         });
@@ -166,7 +165,7 @@
         speak(reply);
       } catch (err) {
         log("Connection Error: " + err.message);
-        speak("Unable to contact ESP32 endpoint.");
+        speak("Unable to contact ESP32 endpoint. Ensure you allowed insecure local content in Chrome.");
       } finally {
         document.getElementById("status").innerText = "Status: Listening...";
       }
